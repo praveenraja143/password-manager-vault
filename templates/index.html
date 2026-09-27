@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aegis Vault • Secure Password Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="background-glow"></div>
+  <div class="grid-overlay"></div>
+
+  <!-- LOCK / MASTER PASSWORD OVERLAY SCREEN -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-card glass-panel">
+      <div class="auth-brand">
+        <div class="brand-shield">
+          <i class="fa-solid fa-shield-halved"></i>
+        </div>
+        <h1 class="brand-title">Aegis Vault</h1>
+        <p class="brand-subtitle" id="authSubtitle">Military-Grade PBKDF2 + AES Encryption</p>
+      </div>
+
+      <div id="authNotice" class="auth-notice hidden"></div>
+
+      <form id="authForm" class="auth-form" onsubmit="handleAuthSubmit(event)">
+        <div class="form-group">
+          <label for="masterPassword" id="masterPasswordLabel">Master Password</label>
+          <div class="input-with-icon">
+            <i class="fa-solid fa-key input-icon"></i>
+            <input type="password" id="masterPassword" placeholder="Enter master key to unlock..." required autocomplete="current-password">
+            <button type="button" class="btn-toggle-eye" onclick="togglePasswordVisibility('masterPassword', this)">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+          <small id="authHint" class="form-hint">Enter your master password to decrypt your local vault.</small>
+        </div>
+
+        <button type="submit" id="authSubmitBtn" class="btn btn-primary btn-glow btn-block">
+          <i class="fa-solid fa-lock-open mr-2"></i>
+          <span>Unlock Vault</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN VAULT DASHBOARD -->
+  <div id="appContainer" class="app-container hidden">
+    <!-- TOP NAVIGATION -->
+    <header class="app-header glass-panel">
+      <div class="header-left">
+        <div class="brand-mark">
+          <i class="fa-solid fa-shield-halved text-cyan"></i>
+          <span class="vault-logo-text">Aegis<span>Vault</span></span>
+          <span class="badge badge-encrypted"><i class="fa-solid fa-lock"></i> Encrypted</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="search-bar glass-input">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="searchInput" placeholder="Search passwords, usernames, sites..." oninput="filterPasswords()">
+          <span class="search-shortcut">Ctrl+K</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button class="btn btn-secondary" onclick="openGeneratorModal()">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span>Generator</span>
+        </button>
+        <button class="btn btn-primary" onclick="openEntryModal()">
+          <i class="fa-solid fa-plus"></i>
+          <span>Add Account</span>
+        </button>
+        <button class="btn btn-danger-outline" onclick="lockVault()" title="Lock Vault">
+          <i class="fa-solid fa-lock"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      <!-- SECURITY HEALTH METRICS BANNER -->
+      <section class="security-banner glass-panel">
+        <div class="banner-stat">
+          <div class="stat-icon-wrapper cyan">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <h3 class="stat-number" id="statTotalLogins">0</h3>
+            <p class="stat-label">Stored Accounts</p>
+          </div>
+        </div>
+
+        <div class="banner-stat">
+          <div class="stat-icon-wrapper green">
+            <i class="fa-solid fa-heart-pulse"></i>
+          </div>
+          <div>
+            <h3 class="stat-number" id="statHealthScore">100%</h3>
+            <p class="stat-label">Vault Health Score</p>
+          </div>
+        </div>
+
+        <div class="banner-stat">
+          <div class="stat-icon-wrapper amber">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h3 class="stat-number" id="statWeakCount">0</h3>
+            <p class="stat-label">Weak Passwords</p>
+          </div>
+        </div>
+
+        <div class="banner-stat">
+          <div class="stat-icon-wrapper red">
+            <i class="fa-solid fa-repeat"></i>
+          </div>
+          <div>
+            <h3 class="stat-number" id="statReusedCount">0</h3>
+            <p class="stat-label">Reused Passwords</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- CATEGORY PILLS BAR -->
+      <div class="filter-controls">
+        <div class="category-pills" id="categoryPills">
+          <button class="pill active" onclick="selectCategory('All', this)">All Accounts (<span id="catCountAll">0</span>)</button>
+          <button class="pill" onclick="selectCategory('Personal', this)">Personal</button>
+          <button class="pill" onclick="selectCategory('Work', this)">Work</button>
+          <button class="pill" onclick="selectCategory('Finance', this)">Finance</button>
+          <button class="pill" onclick="selectCategory('Social', this)">Social</button>
+          <button class="pill" onclick="selectCategory('General', this)">General</button>
+        </div>
+      </div>
+
+      <!-- PASSWORD CARDS GRID -->
+      <section class="vault-grid" id="vaultGrid">
+        <!-- Rendered dynamically -->
+      </section>
+
+      <!-- EMPTY STATE -->
+      <div id="emptyState" class="empty-state hidden glass-panel">
+        <div class="empty-icon"><i class="fa-solid fa-key"></i></div>
+        <h3>No Passwords Found</h3>
+        <p>No credentials match your search or your vault is currently empty.</p>
+        <button class="btn btn-primary" onclick="openEntryModal()">
+          <i class="fa-solid fa-plus"></i> Add First Account
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- ADD / EDIT CREDENTIAL MODAL -->
+  <div id="entryModal" class="modal-backdrop hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <h2 id="entryModalTitle"><i class="fa-solid fa-shield-halved text-cyan mr-2"></i> Add Account</h2>
+        <button class="btn-close" onclick="closeEntryModal()">&times;</button>
+      </div>
+      <form id="entryForm" onsubmit="saveEntry(event)">
+        <input type="hidden" id="entryId">
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="entrySite">Service or Site Name *</label>
+            <input type="text" id="entrySite" placeholder="e.g. GitHub, Google, Netflix" required>
+          </div>
+          <div class="form-group flex-1">
+            <label for="entryCategory">Category</label>
+            <select id="entryCategory">
+              <option value="General">General</option>
+              <option value="Personal">Personal</option>
+              <option value="Work">Work</option>
+              <option value="Finance">Finance</option>
+              <option value="Social">Social</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="entryUsername">Username or Email</label>
+          <input type="text" id="entryUsername" placeholder="e.g. user@example.com">
+        </div>
+
+        <div class="form-group">
+          <div class="label-with-action">
+            <label for="entryPassword">Password *</label>
+            <button type="button" class="btn-text-action" onclick="fillWithGenerated()">
+              <i class="fa-solid fa-sparkles"></i> Auto-Generate
+            </button>
+          </div>
+          <div class="input-with-icon">
+            <input type="password" id="entryPassword" placeholder="Enter secure password" required oninput="evaluatePasswordStrength(this.value)">
+            <button type="button" class="btn-toggle-eye" onclick="togglePasswordVisibility('entryPassword', this)">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+          <div class="strength-meter-bar">
+            <div id="strengthProgress" class="strength-progress"></div>
+          </div>
+          <div class="strength-meta">
+            <span id="strengthText">Strength: None</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="entryUrl">Website URL</label>
+          <input type="url" id="entryUrl" placeholder="https://">
+        </div>
+
+        <div class="form-group">
+          <label for="entryNotes">Secret Notes</label>
+          <textarea id="entryNotes" rows="2" placeholder="Recovery codes, PIN, security questions..."></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeEntryModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-glow">Save Securely</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PASSWORD GENERATOR MODAL -->
+  <div id="genModal" class="modal-backdrop hidden">
+    <div class="modal-card glass-panel">
+      <div class="modal-header">
+        <h2><i class="fa-solid fa-wand-magic-sparkles text-cyan mr-2"></i> Password Generator</h2>
+        <button class="btn-close" onclick="closeGeneratorModal()">&times;</button>
+      </div>
+      <div class="gen-body">
+        <div class="gen-display-box">
+          <span id="genResult" class="gen-text">Click generate</span>
+          <button class="btn-icon-action" onclick="copyGeneratedPassword()" title="Copy to clipboard">
+            <i class="fa-regular fa-copy"></i>
+          </button>
+          <button class="btn-icon-action" onclick="generateNewPassword()" title="Regenerate">
+            <i class="fa-solid fa-rotate-right"></i>
+          </button>
+        </div>
+
+        <div class="slider-control">
+          <div class="slider-header">
+            <span>Password Length</span>
+            <span id="sliderVal" class="slider-number">18</span>
+          </div>
+          <input type="range" id="genLength" min="8" max="40" value="18" oninput="updateSliderVal(this.value)">
+        </div>
+
+        <div class="gen-toggles">
+          <label class="custom-toggle">
+            <input type="checkbox" id="genUpper" checked onchange="generateNewPassword()">
+            <span class="toggle-slider"></span>
+            Uppercase (A-Z)
+          </label>
+          <label class="custom-toggle">
+            <input type="checkbox" id="genLower" checked onchange="generateNewPassword()">
+            <span class="toggle-slider"></span>
+            Lowercase (a-z)
+          </label>
+          <label class="custom-toggle">
+            <input type="checkbox" id="genDigits" checked onchange="generateNewPassword()">
+            <span class="toggle-slider"></span>
+            Numbers (0-9)
+          </label>
+          <label class="custom-toggle">
+            <input type="checkbox" id="genSymbols" checked onchange="generateNewPassword()">
+            <span class="toggle-slider"></span>
+            Symbols (!@#$%)
+          </label>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeGeneratorModal()">Done</button>
+          <button type="button" class="btn btn-primary" onclick="copyAndCloseGenerator()">Copy & Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+vault.json
+instance/
+.pytest_cache/
+.env
+venv/
+.venv/
